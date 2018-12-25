@@ -68,7 +68,7 @@ unsigned long tfs = 0;
 unsigned short int send_errors=0, rec_errors=0, t=0; 
 volatile bool bmp_ok=false, lux_ok=false, dht_ok=false, data_rec=false, rsuc=true;
 volatile bool ispmode = false, drq = false, send_data = false, repsend = false, selfup=false;
-volatile bool data_get=true, narodmon_send=true, force_error=false;
+volatile bool data_get=true, narodmon_send=false, force_error=false;
 char cstr1[BUF_SIZE], replyb[RBUF], rec_buff[RBUF]; //Инициализация временных массивов
 char mac[20]; //Переменная для записи MAC адреса строкой
 
@@ -555,9 +555,11 @@ void loop() {
   yield();
   if (send_data == true && ispmode == false) { //Отправка данных на народный мониторинг
 	  send_data = false; //Сброс флага отправки
-	  if(narodmon_send==1) {
-	  repsend = !NAROD_data_send(cstr1, BUF_SIZE);}
-  }
+	  if(narodmon_send==true) {
+		repsend = !NAROD_data_send(cstr1, BUF_SIZE);
+	  }
+		
+	}
   
   yield();
   if (ispmode == true) { //Режи прошивки

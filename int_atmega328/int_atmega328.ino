@@ -1,6 +1,6 @@
 #include <Adafruit_BMP085.h>
 #include <Adafruit_Sensor.h>
-#include <BH1750.h>
+#include "BH1750.h"
 #include <DHT.h>
 #include "../a1fl.c"
 #include <Wire.h>
