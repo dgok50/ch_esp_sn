@@ -5,6 +5,7 @@
 #define ESP_CH
 #include "a1fl.c" //Библиотека с прекладными функциями
 #include <ArduinoJson.h>
+#include "favicon.c"
 #include <string.h>
 #include <stdio.h>
 #include <ESP8266WebServer.h>
@@ -126,8 +127,11 @@ void avrisp() { //Установка мк в режимпрошивки
   ispmode = true;
 }
 
-const char *webPage = "<!DOCTYPE html>" //Главнаявеб страница
+static const PROGMEM char webPage[] = "<!DOCTYPE html>" //Главнаявеб страница
   "<html>\n"
+  " <head>"
+  "  <link rel=\"shortcut icon\" href=\"favicon.ico\">"
+  " </head>"
   " <body>\n"
   "  <h1>ESP8266 Sensors Web</h1>\n"
   "  <a href= \"/update\">Update dialog</a><br>\n"
@@ -207,10 +211,15 @@ void setup() { //Функция настройки запускается пер
   }
 
   server.on("/", []() { //Инициализация обработчика главной страници
-    server.send(200, "text/html", webPage); //Отправка данных клиенту
+    server.send_P(200, "text/html", webPage); //Отправка данных клиенту
     delay(RDTIME);
   });
 
+  server.on("/favicon.ico", []() {
+	server.send_P(200, "image/x-icon", (const char*)favicon_ico, favicon_ico_len);
+	delay(1000);
+  });   
+  
   server.on("/xml.xml", []() {  //Инициализация обработчика страници XML с данными датчиков
     get_state(cstr1, BUF_SIZE); //Формированиме XML
     server.send(200, "text/xml", cstr1); //Отправка данных клиенту
@@ -760,11 +769,14 @@ int get_state(char *s, unsigned int s_size) { //Формирование XML н�
 		  "  <data_recived>%d</data_recived>\n", fw_ver, esp_vcc, mc_vcc, mc_temp, data_rec);
   if(data_rec == true) {
   sprintf(s, "%s  <data_redy>%f</data_redy>\n", s, rdy);}
+  sprintf(s, "%s  <else_r>%f</else_r>\n", s, rdy);
+  sprintf(s, "%s  <bmp_r>%d</bmp_r>\n", s, bmp_ok);
+  sprintf(s, "%s  <dht_r>%d</dht_r>\n", s, dht_ok);
+  sprintf(s, "%s  <lux_r>%d</lux_r>\n", s, lux_ok);
   sprintf(s, "%s </status>\n", s);  
   if(data_rec == true) {
   sprintf(s, "%s <sensors>\n", s);
   
-  sprintf(s, "%s  <bmp_r>%d</bmp_r>\n", s, bmp_ok);
   if(bmp_ok == true) {
 	sprintf(s, "%s  <bmp>\n",s);
 	sprintf(s,
@@ -773,7 +785,6 @@ int get_state(char *s, unsigned int s_size) { //Формирование XML н�
 	sprintf(s, "%s  </bmp>\n",s);
   }
     
-  sprintf(s, "%s  <dht_r>%d</dht_r>\n", s, dht_ok);
   if(dht_ok == true) {
 	sprintf(s, "%s  <dht>\n",s);
 	sprintf(s,
@@ -782,12 +793,10 @@ int get_state(char *s, unsigned int s_size) { //Формирование XML н�
 	sprintf(s, "%s  </dht>\n",s);
   }
      
-  sprintf(s, "%s  <lux_r>%d</lux_r>\n", s, lux_ok);
   if(lux_ok == true) {
 	sprintf(s, "%s  <lux>%f</lux>\n", s, lux);
   }
     
-  sprintf(s, "%s  <else_r>%f</else_r>\n", s, rdy);
   if(rdy == 1) {
 	sprintf(s, "%s  <else>\n",s);
 	sprintf(s, "%s   <mq7co>%lu</mq7co>\n", s, mq7COppm);
