@@ -88,7 +88,8 @@ long get_scsl(long *mas, unsigned int rr) { //функция усреднени�
   return res/rr;
 }
 
-void A1_data_pr(char *s, unsigned int s_size) { //Формирование пакета протокола локального обменаданными
+#ifdef ESP8266
+void A1_data_pr(char *s, unsigned int s_size) { //Формирование пакета протокола локального обменаданными 
   bzero(s, s_size);
   sprintf(s,
 		  "EVC:%f RSSI:%d", esp_vcc, WiFi.RSSI());
@@ -132,6 +133,7 @@ void A1_data_pr(char *s, unsigned int s_size) { //Формирование па�
   sprintf(s, "%s ;\n\0", s);
   return;
 }
+#endif
 
 struct a1dsp_data_cell {
 	bool is_enc;
