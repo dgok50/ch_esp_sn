@@ -133,7 +133,7 @@ void A1_data_pr(char *s, unsigned int s_size) { //Формирование па�
   sprintf(s, "%s ;\n\0", s);
   return;
 }
-#endif
+
 
 struct a1dsp_data_cell {
 	bool is_enc;
@@ -193,6 +193,7 @@ void A1DSP_Dat_Prep(char *s, unsigned int s_size, struct args, ...) { //Форм
   sprintf(s, "%s ;\n\0", s);
   return;
 }
+#endif
 
 #ifndef ESP_CH
 void bzero(void *mas, size_t bits){
