@@ -16,6 +16,7 @@
 #include <Ticker.h>
 #include <limits.h>
 #include <float.h>
+#include <WiFiUdp.h>
 
 
 /*Обьявление макросов*/
@@ -46,7 +47,8 @@
 
 char hostname_load[20]; //Имя хоста
 const int fw_ver = 136; //Версия прошивки
-
+IPAddress m_ip(239,243,42,19);
+unsigned int m_port = 6219;
 Ticker data_collect, data_send_tic; //Обьявление таймеров событий
 
 ADC_MODE(ADC_VCC); //Установка АЦП в режим считывания питающиго напряжения
@@ -57,6 +59,7 @@ ESP8266AVRISP avrprog(328, 2); //Инициализация библиотеки
 ESP8266WebServer server(80); //Инициализация библиотеки веб сервера, с установкой порта
 ESP8266HTTPUpdateServer httpUpdater; //Инициализация библиотеки сервера самообновления
 WiFiClient client;
+WiFiUDP udp;
   
 /*Инициализация переменных*/
 float mqv=0, mqv5=0, mq1=0, mq2=0, mq2_5=0, mq2_ro=0, mq2_5ro=0, mq1_ro=0;
@@ -148,7 +151,7 @@ static const PROGMEM char webPage[] = "<!DOCTYPE html>" //Главнаявеб �
   "  <a href= \"/parse.txt\">Разбор сырых данных от подченённого МК</a><br>\n"
   "  <a href= \"/set?avr_reset=1\">Перезапуск подченённого МК</a><br>\n"
   "  <a href= \"/set?restart=1\">Перезагрузка</a><br>\n"
-  "  <a href= \"/set?format=243\">Сброс настроекst</a><br>\n"
+  "  <a href= \"/set?format=243\">Сброс настроек</a><br>\n"
   "  <a href= \"/set?reset_ro=243\">Сброс MQ ro константы</a><br>\n"
   "  <a href= \"/set?avrisp_s=1\">Перейти в режим ISP</a><br>\n"
   " </body>\n"
@@ -245,7 +248,7 @@ void setup() { //Функция настройки запускается пер
 	bzero(cstr1, BUF_SIZE);
 	
 	if(hostname_load[1]=='\0') {
-		strlcpy(hostname_load,DEFHOSTNAME, sizeof(hostname_load));
+		strlcpy(hostname_load, DEFHOSTNAME, sizeof(hostname_load));
 		saveConfig();
 	}
 	/*Вывод имя хоста и версии прошивки*/
@@ -447,6 +450,7 @@ void setup() { //Функция настройки запускается пер
   });
 
   server.begin();
+  udp.begin(m_port);
   httpUpdater.setup(&server);
   data_collect.attach(60, k_tdp); //Установка таймера считывание данных 1 мин
   data_send_tic.attach(300, data_send_f); //Установка таймера отправки данных на 5мин
@@ -562,6 +566,12 @@ void loop() {
 		rec_errors++;
 	}
 	drq=false;
+	
+	udp.beginPacket(m_ip, m_port);
+	A1_data_pr(cstr1, BUF_SIZE);
+	udp.write(cstr1);
+	udp.endPacket();
+	
   }
   
   yield();
@@ -607,7 +617,7 @@ bool loadConfig() { //Функция загрузки конфигурации
     return false;
   }
 
-  StaticJsonBuffer<1024> jsonBuffer;
+  DynamicJsonBuffer jsonBuffer(1024);
   
   JsonObject &rootp = jsonBuffer.parseObject(configFile);
 
@@ -646,7 +656,7 @@ bool saveConfig() {
   if (!configFile) {
     return false;
   }
-  StaticJsonBuffer<256> jsonBuffer;
+  DynamicJsonBuffer jsonBuffer(1024);
   JsonObject &rootp = jsonBuffer.createObject();
   rootp["fw_ver"]=fw_ver;
   rootp["mac"]=mac;
@@ -767,12 +777,13 @@ int get_state(char *s, unsigned int s_size) { //Формирование XML н�
 		  " </fw>\n"
 		  " <status>\n"
 		  "  <esp_vcc>%f</esp_vcc>\n"
+		  "  <esp_rssi>%d</esp_rssi>\n"
 		  "  <mc_vcc>%f</mc_vcc>\n"
 		  "  <mc_tmp>%f</mc_tmp>\n"
-		  "  <data_recived>%d</data_recived>\n", fw_ver, esp_vcc, mc_vcc, mc_temp, data_rec);
+		  "  <data_recived>%d</data_recived>\n", fw_ver, esp_vcc, WiFi.RSSI(), mc_vcc, mc_temp, data_rec);
   if(data_rec == true) {
   sprintf(s, "%s  <data_redy>%f</data_redy>\n", s, rdy);}
-  sprintf(s, "%s  <else_r>%f</else_r>\n", s, rdy);
+  sprintf(s, "%s  <else_r>%.0f</else_r>\n", s, rdy);
   sprintf(s, "%s  <bmp_r>%d</bmp_r>\n", s, bmp_ok);
   sprintf(s, "%s  <dht_r>%d</dht_r>\n", s, dht_ok);
   sprintf(s, "%s  <lux_r>%d</lux_r>\n", s, lux_ok);

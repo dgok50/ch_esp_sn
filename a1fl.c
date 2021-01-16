@@ -88,6 +88,110 @@ long get_scsl(long *mas, unsigned int rr) { //функция усреднени�
   return res/rr;
 }
 
+void A1_data_pr(char *s, unsigned int s_size) { //Формирование пакета протокола локального обменаданными
+  bzero(s, s_size);
+  sprintf(s,
+		  "EVC:%f RSSI:%d", esp_vcc, WiFi.RSSI());
+  if(data_rec == true) { 
+  sprintf(s,
+		  "%s MVC:%f"
+		  " MTMP:%f", s, mc_vcc, mc_temp);
+  if(bmp_ok == true) {
+	sprintf(s,
+			"%s BTMP:%f"
+			" BPRE:%f", s, bmp_temp, bmp_pre);
+  }
+  if(dht_ok == true) {
+	sprintf(s,
+			"%s DTMP:%f"
+			  " DHUM:%f", s, dht_temp, dht_hum);
+  }
+  sprintf(s, "%s FW:%d", s, fw_ver);
+  if(lux_ok == true) {
+	sprintf(s, "%s LUX:%f", s, lux);
+  }
+    
+  if(rdy == 1) {
+	sprintf(s,
+			"%s VIN:%f", s, vin);
+  }
+    if(mqv > 1.4 && mqv < 1.5 && mqv5 < 5.4 && mqv5 > 4.9){
+	   if(mq1_ro!=0){
+		  mq7COppm= readScaled(-0.77, 3.38, readRatio(calculateResistance(mq1/10, mc_vcc, MQ7_RL), mq1_ro));
+		  sprintf(s, "%s MQ7:%lu", s, mq7COppm);
+	   }
+	   if(mq2_5ro!=0){
+		  mq9COppm=readScaled(-0.48, 3.10, readRatio(calculateResistance(mq2_5/10, mc_vcc, MQ9_RL), mq2_5ro));
+		  sprintf(s, "%s MQ9:%lu", s, mq9COppm);
+		  
+		  mq9LPGppm= readScaled(-0.48, 3.33, readRatio(calculateResistance(mq2_5/10, mc_vcc, MQ9_RL), mq2_5ro));
+		  sprintf(s, "%s MQ9L:%lu", s, mq9LPGppm);
+	   }
+    }
+  }
+  sprintf(s, "%s ;\n\0", s);
+  return;
+}
+
+struct a1dsp_data_cell {
+	bool is_enc;
+	bool is_bin;
+	bool is_float;
+	char *name;
+	char *data;
+	char *data_type;
+	char *enc;
+	unsigned int crc;
+	float data_float;
+	size_t name_len;
+	size_t data_len;
+};
+
+struct a1dsp_data_pack {
+	bool is_arq;
+	bool is_aan;
+	bool is_float;
+	char *host_guid;
+	char *dev_guid;
+	char *dev_key;
+	char *dev_pinrq;
+	char *enc;
+	unsigned int crc;
+	size_t cells_num;
+	struct a1dsp_data_cell **cells;
+};
+
+struct a1dsp_data_cell A1DSP_Cell_cre();
+
+void A1DSP_Dat_Prep(char *s, unsigned int s_size, struct args, ...) { //Формирование пакета протокола локального обменаданными
+  bzero(s, s_size);
+  unsigned long i, tmp_col = 0;
+  if(sred->data_usred == NULL) {
+    fprintf(stderr,"[usred_write] Ошибка структура усреднения не инециализированна\n");
+    return 3;
+  }
+  if (args > sred->data_usred_col) //Выход при превышение количества переменных для входа
+    return 1;
+  va_list ap; //Создание списка арг
+
+  va_start (ap, args); //Начало разбора списка аргументов
+  /*TODO:
+    Сделать авто reloc при увеличение входных данных
+    Сделать распознавание количества аргументов(через NULL ptr?..)*/
+  for (i = 0; i < args; i++) {
+      double *data_ptr = va_arg (ap, double *); //Выделение временного указателя
+      if(*data_ptr != 0)
+	sred->data[sred->data_index][i] = *data_ptr; //Запись данных в массив для усреднения
+      if (sred->data_redy == 1 && *data_ptr != 0 && *data_ptr < (sred->data_usred[i]*1.5) && *data_ptr > (sred->data_usred[i]*0.5)) //В случае готовности усреднённых данных
+        *data_ptr = sred->data_usred[i]; //Вывод их на место входных
+    }
+  va_end (ap); //Окончание разбора аргументов
+
+
+  sprintf(s, "%s ;\n\0", s);
+  return;
+}
+
 #ifndef ESP_CH
 void bzero(void *mas, size_t bits){
 	char *s =  (char*)mas;
