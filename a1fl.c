@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include <avr/boot.h>
+
 
 //Лимиты для максимального и минимального уровня сигнала 
 #define rssi_min -90
@@ -361,60 +363,79 @@ for (i = 0; i < rc; i++)
 return rc;
 }
 
-void mac_gen(uint8_t *mac, bool atmel_base, byte seed)
-{
+/*
+ * Функция генерируящая MAC адресс на базе id avr-ки на базе серийника
+ * Пример использования:
+ * byte mac[6];
+ * mac_gen(mac, true, 0x00);
+ * сгенерированный mac сохраняется в массив mac[6]
+ * Описание параметров:
+ * byte *mac - указатель на массив для сохранения MAC адреса
+ * bool atmel_base (по умолчанию false)
+ *      true - использовать OUI atmel-а как базу, генерируются только последнии 3 байта (позволяет быстро найти все устройства с таким маком в сети)
+ *      false - создвть технический MAC, генерируются все 6 байт
+ * byte seed (по умолчаннию 0x00)
+ *      0x00 - в случае выявления повторения MAC заменяется на любое значение на одном из устройств для устранения конфликта
+ *
+*/
+void mac_gen(byte *mac, bool atmel_base, byte seed) {
 #if defined(__AVR_ATmega328PB__)
 #define UniqueIDsize 10
 #else
 #define UniqueIDsize 9
 #endif
 
-  uint8_t id[UniqueIDsize];
+    byte id[UniqueIDsize];
 
-  for (size_t i = 0; i < UniqueIDsize; i++)
-  {
-    id[i] = boot_signature_byte_get(0x0E + i + (UniqueIDsize == 9 && i > 5 ? 1 : 0));
-  }
+    for (size_t i = 0; i < UniqueIDsize; i++) {
+        id[i] = boot_signature_byte_get(0x0E + i + (UniqueIDsize == 9 && i > 5 ? 1 : 0));
+    }
 
-  if (atmel_base) //если нужно что-бы можно было обнаружить в локалке все ардуинки по начальному префиксу  юзаем atmel-ский (OUI) vendor id
-  {
-    //vendor id atmel
-    mac[0] = 0x00;
-    mac[1] = 0x04;
-    mac[2] = 0x25;
+    /*
+     * если нужно что-бы можно было обнаружить в локалке все avr-ки
+     *  по начальному префиксу юзаем atmel-ский (OUI) vendor id
+     */
+    if (atmel_base)
+    {
+        //vendor id atmel (OUI)
+        mac[0] = 0x00;
+        mac[1] = 0x04;
+        mac[2] = 0x25;
 
-    //xor-им uid avr-ки и получаем 3 уникальных байта и юзаем их как nic
-    mac[3] = id[0] ^ id[1] ^ id[2];
-    mac[4] = id[3] ^ id[4] ^ id[5];
+        //xor-им uid avr-ки и получаем 3 уникальных байта и юзаем их как nic
+        mac[3] = id[0] ^ id[1] ^ id[2];
+        mac[4] = id[3] ^ id[4] ^ id[5];
 
 #if defined(__AVR_ATmega328PB__)
-    mac[5] = id[6] ^ id[7] ^ id[8] ^ id[9];
+        mac[5] = id[6] ^ id[7] ^ id[8] ^ id[9];
 #else
-    mac[5] = id[6] ^ id[7] ^ id[8];
+        mac[5] = id[6] ^ id[7] ^ id[8];
 #endif
-  }
-  else
-  {
-    //xor-им uid avr-ки и получаем 6 уникальных байт и юзаем их
-    mac[0] = id[0];
-    //выставляем биты в соответствии с ISO 9542 (ГОСТ Р ИСО 9542-93)
-    mac[0] &= ~(1 << 0); //адрес одиночный
-    mac[0] |=  (1 << 1); //не содержит OUI
-    
-    mac[1] = id[1];
-    mac[2] = id[2];
-    mac[3] = id[3] ^ id[4];
-    mac[4] = id[2] ^ id[6];
+    } else {
+        //xor-им uid avr-ки и получаем 6 уникальных байт и юзаем их
+        mac[0] = id[0];
+        //выставляем биты в соответствии с ISO 9542 (ГОСТ Р ИСО 9542-93)
+        mac[0] &= ~(1 << 0); //адрес одиночный
+        mac[0] |= (1 << 1); //не содержит OUI
+
+        mac[1] = id[1];
+        mac[2] = id[2];
+        mac[3] = id[3] ^ id[4];
+        mac[4] = id[2] ^ id[6];
 #if defined(__AVR_ATmega328PB__)
-    mac[5] = id[7] ^ id[8] ^ id[9];
+        mac[5] = id[7] ^ id[8] ^ id[9];
 #else
-    mac[5] = id[7] ^ id[8];
+        mac[5] = id[7] ^ id[8];
 #endif
-  }
-  mac[5] = mac[5] ^ seed; //на случай совпадения маков добовляем указанный сиид
+    }
+    mac[5] = mac[5] ^ seed; //на случай совпадения маков добовляем указанный сиид
 }
 
-void mac_gen(uint8_t *mac, bool atmel_base){
-  mac_gen(mac, atmel_base, 0x00);
+void mac_gen(byte *mac, bool atmel_base) {
+    mac_gen(mac, atmel_base, 0x00);
+}
+
+void mac_gen(byte *mac) {
+    mac_gen(mac, false, 0x00);
 }
 #endif
